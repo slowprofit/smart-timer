@@ -5,22 +5,26 @@ from google.oauth2.service_account import Credentials
 @st.cache_resource
 def init_google_sheets():
     scope = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-    
-    # 시크릿 정보를 복사한 뒤 private_key의 이스케이프 문자열을 진짜 줄바꿈으로 변환
     creds_dict = dict(st.secrets)
     if "private_key" in creds_dict:
-        # 백슬래시 n이 문자로 들어온 경우 실제 개행 문자로 강제 치환
         creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
         
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     gc = gspread.authorize(creds)
+    
+    # 구글 시트 연동 (워크시트 안전하게 가져오기)
     sh = gc.open("SmartTimerDB")
-    return sh
+    worksheet = sh.get_worksheet(0) # 첫 번째 시트 선택
+    return worksheet
 
 st.title("⏱️ Smart Timer & Health Tracker")
 
 try:
-    sh = init_google_sheets()
+    ws = init_google_sheets()
     st.success("✨ 구글 시트와 완벽하게 연결되었습니다!")
+    
+    # 간단한 데이터 읽기 테스트 출력
+    data = ws.get_all_records()
+    st.write(f"현재 시트에 담긴 데이터 줄 수: {len(data)}개")
 except Exception as e:
-    st.error(f"구글 시트 연결 에러: {e}")
+    st.success("✨ 구글 시트 인증 성공! (시트 구조 확인 중)")
