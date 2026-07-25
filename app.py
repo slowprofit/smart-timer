@@ -24,11 +24,29 @@ st.markdown("""
     .stTabs [data-baseweb="tab"] { padding: 10px 12px !important; font-size: 15px !important; }
     div[data-testid="stForm"] { padding: 10px !important; }
     h1, h2, h3 { margin-bottom: 0.2rem !important; }
+    
+    /* 버튼 크기 및 텍스트 줄바꿈 방지 */
     .stButton>button {
-        height: 75px !important; 
-        white-space: pre-wrap !important; 
+        height: 60px !important; 
+        white-space: nowrap !important; 
         border-radius: 12px !important;
         font-weight: bold;
+        font-size: 14px !important;
+        padding: 0px 5px !important;
+    }
+    
+    /* 🔥 핵심: 모바일에서 컬럼들이 세로로 떨어지지 않고 한 줄에 꽉 차게 강제 배치 */
+    @media (max-width: 768px) {
+        div[data-testid="stHorizontalBlock"] {
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+            gap: 5px !important;
+        }
+        div[data-testid="column"] {
+            width: auto !important;
+            min-width: 0 !important;
+            flex: 1 1 0% !important;
+        }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -226,17 +244,37 @@ else:
     with tab1:
         if not st.session_state.tasks: st.info("실행 중인 작업이 없습니다.")
         for task_id, t_info in list(st.session_state.tasks.items()):
-            st.markdown(f"**[{t_info['큰 분류']}] {t_info['업무분류']} - {t_info['업무세부분류']}**")
-            col_b1, col_b2 = st.columns(2)
+            # --- 실시간 누적 시간 계산 ---
+            total_seconds = t_info['actual_seconds']
             if t_info['status'] == 'running':
-                if col_b1.button("⏸️ 멈춤", key=f"p_{task_id}"): pause_task(task_id); st.rerun()
-            else:
-                if col_b1.button("▶️ 재시작", key=f"r_{task_id}"): resume_task(task_id); st.rerun()
-            if col_b2.button("⏹️ 저장", key=f"e_{task_id}"): end_task(task_id); st.rerun()
+                total_seconds += (get_now() - t_info['last_resume_time']).total_seconds()
+            
+            m, s = divmod(int(total_seconds), 60)
+            time_display = f"{m:02d}:{s:02d}"
+
+            # --- 모바일에서도 가로로 고정되는 3열 레이아웃 ---
+            c1, c2, c3 = st.columns([4, 3, 3])
+            
+            with c1:
+                # 텍스트가 잘리지 않고 말줄임표(...) 처리되며 버튼 높이와 맞게 패딩 추가
+                st.markdown(f"<div style='padding-top:15px; font-size:14px; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{t_info['업무세부분류']}</div>", unsafe_allow_html=True)
+            with c2:
+                if t_info['status'] == 'running':
+                    if st.button(f"⏸️ {time_display}", key=f"p_{task_id}", use_container_width=True): 
+                        pause_task(task_id)
+                        st.rerun()
+                else:
+                    if st.button(f"▶️ {time_display}", key=f"r_{task_id}", use_container_width=True): 
+                        resume_task(task_id)
+                        st.rerun()
+            with c3:
+                if st.button("⏹️ 저장", key=f"e_{task_id}", use_container_width=True): 
+                    end_task(task_id)
+                    st.rerun()
+            
             st.markdown("---")
 
     with tab2:
-        # 타이머 시작 성공 메시지 (재렌더링 후 표시됨)
         if st.session_state.get('task_started', False):
             st.success("✅ 타이머가 시작되었습니다! '1작업중' 탭에서 확인하세요.")
             st.session_state.task_started = False
@@ -248,12 +286,11 @@ else:
             sub_task = c2.text_input("업무세부분류")
             amount = st.number_input("목표량(개)", min_value=1, value=1, step=1)
             
-            # --- 수정된 부분: 시작 버튼 클릭 즉시 새로고침(rerun) 실행 ---
             if st.form_submit_button("타이머 시작"):
                 if task and sub_task:
                     create_task(main_cat, task, sub_task, amount)
-                    st.session_state.task_started = True  # 성공 상태 저장
-                    st.rerun()  # 화면을 강제로 다시 그려서 1번 탭을 즉시 업데이트
+                    st.session_state.task_started = True 
+                    st.rerun() 
                 else:
                     st.warning("업무분류와 업무세부분류를 모두 입력해주세요.")
 
