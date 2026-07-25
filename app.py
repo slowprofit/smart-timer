@@ -11,53 +11,79 @@ def get_now():
     kst = timezone(timedelta(hours=9))
     return datetime.now(kst).replace(tzinfo=None)
 
-# --- 🔥 모바일 레이아웃 절대 방어 CSS ---
+# --- 🔥 궁극의 모바일 레이아웃 강제 고정 CSS ---
 st.markdown("""
     <style>
+    /* 1. 전체 여백 최소화 및 화면 밖 밀림(가로 스크롤) 절대 방지 */
     .block-container {
-        padding-top: 3.5rem !important; 
-        padding-bottom: 1rem !important;
-        padding-left: 0.2rem !important;
-        padding-right: 0.2rem !important;
+        padding: 2.5rem 0.2rem 1rem 0.2rem !important;
         max-width: 100vw !important;
         overflow-x: hidden !important; 
+        box-sizing: border-box !important;
     }
-    .stTabs [data-baseweb="tab-list"] { gap: 3px; }
-    .stTabs [data-baseweb="tab"] { padding: 8px 6px !important; font-size: 13px !important; }
-    div[data-testid="stForm"] { padding: 10px !important; }
-    h1, h2, h3 { margin-bottom: 0.2rem !important; }
+    .stTabs [data-baseweb="tab-list"] { gap: 2px; }
+    .stTabs [data-baseweb="tab"] { padding: 6px 4px !important; font-size: 13px !important; }
     
-    .stButton>button {
+    /* 2. 버튼 최적화 (글씨가 길어도 폭발하지 않고 내부 줄바꿈됨) */
+    .stButton > button {
         height: auto !important; 
         min-height: 45px !important; 
         white-space: pre-wrap !important; 
-        word-break: keep-all !important;
-        border-radius: 8px !important;
+        word-break: break-all !important; 
+        border-radius: 6px !important;
         font-weight: bold;
         font-size: 12px !important;
-        padding: 4px !important; 
+        padding: 2px !important; 
         width: 100% !important;
-        min-width: 0px !important;
+        min-width: 0 !important;
+        line-height: 1.2 !important;
+        box-sizing: border-box !important;
+        margin: 0 !important;
     }
 
     div[data-baseweb="input"], div[data-baseweb="select"] {
         min-width: 0 !important;
         width: 100% !important;
+        box-sizing: border-box !important;
     }
     
-    /* 🔥 더 강력한 모바일 3분할 강제 고정 CSS */
+    /* 3. 🔥 THE MAGIC FIX: 모든 컬럼(st.columns)을 한 줄에 수학적으로 균등 배분 */
     @media (max-width: 768px) {
-        [data-testid="stHorizontalBlock"] {
+        div[data-testid="stHorizontalBlock"] {
+            display: flex !important;
             flex-direction: row !important;
             flex-wrap: nowrap !important;
             width: 100% !important;
+            max-width: 100% !important;
             gap: 4px !important;
+            overflow: hidden !important;
+            box-sizing: border-box !important;
+            padding: 0 !important;
+            margin: 0 !important;
         }
-        [data-testid="stHorizontalBlock"] > [data-testid="column"] {
-            width: 33% !important;
-            flex: 1 1 33% !important;
-            min-width: 0 !important;
+        div[data-testid="column"] {
+            flex: 1 1 0% !important;  /* 칸 수(3개면 1/3, 2개면 1/2)에 맞춰 알아서 나눔 */
+            width: 0 !important;      /* 내용물이 아무리 커도 컨테이너 폭발 방지 */
+            min-width: 0 !important;  
+            padding: 0 !important;
+            margin: 0 !important;
+            box-sizing: border-box !important;
         }
+    }
+    
+    /* 4. 작업명 등 텍스트용 방어막 래퍼 */
+    .txt-wrap {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        min-height: 45px;
+        font-size: 13px;
+        font-weight: bold;
+        text-align: center;
+        word-break: break-all;
+        line-height: 1.2;
+        overflow: hidden;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -217,7 +243,6 @@ if st.session_state.admin_mode:
             
     with admin_tab2:
         new_cat = st.text_input("새로운 업무 분류 추가")
-        # 🔥 에러 원인 해결: 고유 키(key="add_cat_btn") 부여
         if st.button("➕ 추가", key="add_cat_btn", use_container_width=True) and new_cat not in st.session_state.categories:
             st.session_state.categories.append(new_cat)
             save_all_config(st.session_state.categories, st.session_state.health_settings, st.session_state.app_settings)
@@ -225,17 +250,17 @@ if st.session_state.admin_mode:
             
         st.write("**현재 분류 목록**")
         for cat in st.session_state.categories:
-            c1, c2 = st.columns([8, 2])
-            c1.write(f"- {cat}")
-            if c2.button("❌", key=f"del_cat_{cat}"):
+            c1, c2 = st.columns(2)
+            c1.markdown(f"<div class='txt-wrap' style='justify-content:flex-start;'>- {cat}</div>", unsafe_allow_html=True)
+            if c2.button("❌", key=f"del_cat_{cat}", use_container_width=True):
                 st.session_state.categories.remove(cat)
                 save_all_config(st.session_state.categories, st.session_state.health_settings, st.session_state.app_settings)
                 st.rerun()
 
     with admin_tab3:
+        # 입력창은 세로로 넓게 배치! (찌그러짐 원천 차단)
         new_h_name = st.text_input("새 항목명")
         new_h_time = st.number_input("시간(분)", min_value=1, value=10)
-        # 🔥 에러 원인 해결: 고유 키(key="add_health_btn") 부여
         if st.button("➕ 추가", key="add_health_btn", use_container_width=True) and new_h_name:
             st.session_state.health_settings[new_h_name] = new_h_time
             save_all_config(st.session_state.categories, st.session_state.health_settings, st.session_state.app_settings)
@@ -243,9 +268,9 @@ if st.session_state.admin_mode:
             
         st.write("**현재 건강 항목**")
         for h_name, h_time in st.session_state.health_settings.items():
-            cc1, cc2 = st.columns([8, 2])
-            cc1.write(f"**{h_name}** / **{h_time}분**")
-            if cc2.button("❌", key=f"del_h_{h_name}"):
+            cc1, cc2 = st.columns(2)
+            cc1.markdown(f"<div class='txt-wrap' style='justify-content:flex-start;'>{h_name} / {h_time}분</div>", unsafe_allow_html=True)
+            if cc2.button("❌", key=f"del_h_{h_name}", use_container_width=True):
                 del st.session_state.health_settings[h_name]
                 save_all_config(st.session_state.categories, st.session_state.health_settings, st.session_state.app_settings)
                 st.rerun()
@@ -288,9 +313,10 @@ else:
             if len(display_title) > 6:
                 display_title = display_title[:6] + ".."
 
-            c1, c2, c3 = st.columns([3, 3, 3])
+            # 이제 3칸은 무조건 33.3%씩 평화롭게 나눠 가집니다.
+            c1, c2, c3 = st.columns(3)
             with c1:
-                st.markdown(f"<div style='display:flex; align-items:center; justify-content:center; height:100%; min-height:45px; font-size:13px; font-weight:bold;'>{display_title}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='txt-wrap'>{display_title}</div>", unsafe_allow_html=True)
             with c2:
                 if t_info['status'] == 'running':
                     if st.button(f"⏸️\n{time_display}", key=f"p_{task_id}", use_container_width=True): 
@@ -312,6 +338,7 @@ else:
             st.session_state.task_started = False
         with st.form("start_form"):
             main_cat = st.selectbox("큰 분류", st.session_state.categories)
+            # 입력창 세로 배치 유지
             task = st.text_input("업무분류 (예: 독서)")
             sub_task = st.text_input("업무세부분류 (예: 1장)")
             amount = st.number_input("목표량(개)", min_value=1, value=1, step=1)
@@ -334,7 +361,8 @@ else:
 
         items = list(st.session_state.health_settings.items())
         for i in range(0, len(items), 2):
-            cols = st.columns([5, 5])
+            # 건강 탭 2칸도 무조건 50%씩 평화롭게 나눠 가집니다.
+            cols = st.columns(2)
             h_name, h_time = items[i]
             count = today_health_counts.get(h_name, 0)
             is_vitamin = "비타민" in h_name or "vitamin" in h_name.lower()
@@ -343,7 +371,7 @@ else:
                     if count >= 1: btn_label, is_disabled = f"✅ {h_name}\n[완료]", True
                     else: btn_label, is_disabled = f"💊 {h_name}\n(+{h_time}분)", False
                 else:
-                    btn_label, is_disabled = f"{h_name}\n{count}회 " + ("🟦" * count), False
+                    btn_label, is_disabled = f"{h_name}\n{count}회", False
                 if st.button(btn_label, key=f"do_{h_name}", disabled=is_disabled, use_container_width=True):
                     log_health(h_name, h_time)
                     st.rerun()
@@ -356,7 +384,7 @@ else:
                         if count2 >= 1: btn_label2, is_disabled2 = f"✅ {h_name2}\n[완료]", True
                         else: btn_label2, is_disabled2 = f"💊 {h_name2}\n(+{h_time2}분)", False
                     else:
-                        btn_label2, is_disabled2 = f"{h_name2}\n{count2}회 " + ("🟦" * count2), False
+                        btn_label2, is_disabled2 = f"{h_name2}\n{count2}회", False
                     if st.button(btn_label2, key=f"do_{h_name2}", disabled=is_disabled2, use_container_width=True):
                         log_health(h_name2, h_time2)
                         st.rerun()
