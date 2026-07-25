@@ -14,38 +14,39 @@ def get_now():
 # --- 모바일 최적화 및 커스텀 사각 버튼 CSS ---
 st.markdown("""
     <style>
+    /* 전체 화면 여백 최소화 및 가로 스크롤 원천 차단 */
     .block-container {
         padding-top: 3.5rem !important; 
         padding-bottom: 1rem !important;
         padding-left: 0.5rem !important;
         padding-right: 0.5rem !important;
+        max-width: 100% !important;
+        overflow-x: hidden !important; 
     }
     .stTabs [data-baseweb="tab-list"] { gap: 5px; }
-    .stTabs [data-baseweb="tab"] { padding: 10px 12px !important; font-size: 15px !important; }
+    .stTabs [data-baseweb="tab"] { padding: 10px 10px !important; font-size: 14px !important; }
     div[data-testid="stForm"] { padding: 10px !important; }
     h1, h2, h3 { margin-bottom: 0.2rem !important; }
     
-    /* 버튼 크기 및 텍스트 줄바꿈 방지 */
+    /* 버튼 크기를 텍스트에 딱 맞게 축소 (콤팩트 사이즈) */
     .stButton>button {
-        height: 60px !important; 
+        height: 50px !important; 
         white-space: nowrap !important; 
-        border-radius: 12px !important;
+        border-radius: 8px !important;
         font-weight: bold;
-        font-size: 14px !important;
-        padding: 0px 5px !important;
+        font-size: 13px !important;
+        padding: 0px 4px !important; 
     }
     
-    /* 🔥 핵심: 모바일에서 컬럼들이 세로로 떨어지지 않고 한 줄에 꽉 차게 강제 배치 */
+    /* 모바일 환경에서 컬럼이 깨지지 않도록 강제 1줄 배치 */
     @media (max-width: 768px) {
         div[data-testid="stHorizontalBlock"] {
             flex-direction: row !important;
             flex-wrap: nowrap !important;
-            gap: 5px !important;
+            gap: 4px !important;
         }
         div[data-testid="column"] {
-            width: auto !important;
             min-width: 0 !important;
-            flex: 1 1 0% !important;
         }
     }
     </style>
@@ -252,12 +253,12 @@ else:
             m, s = divmod(int(total_seconds), 60)
             time_display = f"{m:02d}:{s:02d}"
 
-            # --- 모바일에서도 가로로 고정되는 3열 레이아웃 ---
-            c1, c2, c3 = st.columns([4, 3, 3])
+            # 🔥 황금 비율 설정: 텍스트(55%) | 멈춤버튼(27%) | 저장버튼(18%)
+            c1, c2, c3 = st.columns([55, 27, 18])
             
             with c1:
-                # 텍스트가 잘리지 않고 말줄임표(...) 처리되며 버튼 높이와 맞게 패딩 추가
-                st.markdown(f"<div style='padding-top:15px; font-size:14px; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{t_info['업무세부분류']}</div>", unsafe_allow_html=True)
+                # 텍스트가 너무 길면 자동으로 ... 처리되도록 방어막 추가
+                st.markdown(f"<div style='padding-top:14px; font-size:14px; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{t_info['업무세부분류']}</div>", unsafe_allow_html=True)
             with c2:
                 if t_info['status'] == 'running':
                     if st.button(f"⏸️ {time_display}", key=f"p_{task_id}", use_container_width=True): 
@@ -268,6 +269,7 @@ else:
                         resume_task(task_id)
                         st.rerun()
             with c3:
+                # 저장 버튼은 글자가 작으므로 가장 좁은 공간을 할당
                 if st.button("⏹️ 저장", key=f"e_{task_id}", use_container_width=True): 
                     end_task(task_id)
                     st.rerun()
