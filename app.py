@@ -14,21 +14,23 @@ def get_now():
 # --- 모바일 최적화 및 커스텀 사각 버튼 CSS ---
 st.markdown("""
     <style>
+    /* 여백을 극한으로 줄여서 모바일 화면 낭비 최소화 */
     .block-container {
         padding-top: 3.5rem !important; 
         padding-bottom: 1rem !important;
-        padding-left: 0.5rem !important;
-        padding-right: 0.5rem !important;
+        padding-left: 0.3rem !important;
+        padding-right: 0.3rem !important;
         max-width: 100vw !important;
+        overflow-x: hidden !important; 
     }
     .stTabs [data-baseweb="tab-list"] { gap: 3px; }
     .stTabs [data-baseweb="tab"] { padding: 8px 6px !important; font-size: 13px !important; }
     div[data-testid="stForm"] { padding: 10px !important; }
     h1, h2, h3 { margin-bottom: 0.2rem !important; }
     
-    /* 모바일 맞춤형 콤팩트 버튼 (글자가 잘리지 않고 줄어듦) */
+    /* 버튼 초소형화 (텍스트 길이에 맞춰 찌그러지지 않게) */
     .stButton>button {
-        height: 45px !important; 
+        height: 40px !important; 
         white-space: nowrap !important; 
         border-radius: 8px !important;
         font-weight: bold;
@@ -38,10 +40,12 @@ st.markdown("""
         min-width: 0px !important;
     }
     
-    /* 🔥 컬럼 강제 가로 배치 (화면 밖으로 밀려남 방지) */
+    /* 🔥 1번 탭: 컬럼 강제 가로 배치 및 가로 스크롤 절대 차단 */
     @media (max-width: 768px) {
         div[data-testid="stHorizontalBlock"] {
+            flex-direction: row !important;
             flex-wrap: nowrap !important;
+            width: 100% !important;
             gap: 4px !important;
             overflow: hidden !important;
         }
@@ -49,11 +53,15 @@ st.markdown("""
             width: auto !important;
             min-width: 0 !important;
         }
+        /* 각 열의 너비 비율 강제 고정 (작업명 4.5 : 멈춤 3.5 : 저장 2) */
+        div[data-testid="column"]:nth-child(1) { flex: 4.5 !important; }
+        div[data-testid="column"]:nth-child(2) { flex: 3.5 !important; }
+        div[data-testid="column"]:nth-child(3) { flex: 2 !important; }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 구글 스프레드시트 클라우드 안전 연결 함수 ---
+# --- 구글 스프레드시트 연결 함수 ---
 @st.cache_resource
 def init_google_sheets():
     scope = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
@@ -78,24 +86,22 @@ def get_or_create_sheet(sheet_name, headers):
 ws_tasks = get_or_create_sheet('Tasks', ['날짜', '연도', '월', '큰 분류', '업무분류', '업무세부분류', '작업량', '시작시간', '끝시간', '총 시간(분)', '실제 일한 시간(분)', '단위 소요시간(분/개)'])
 ws_health = get_or_create_sheet('Health', ['날짜', '시간', '건강항목', '획득시간(분)'])
 ws_config = get_or_create_sheet('Config', ['Category', 'Key', 'Value'])
+# 🔥 진행 중인 작업을 영구 저장하는 시트 추가 (새로고침 방어용)
+ws_running = get_or_create_sheet('RunningTasks', ['task_id', '큰 분류', '업무분류', '업무세부분류', '작업량', 'status', 'start_time', 'last_resume_time', 'actual_seconds'])
 
-# --- 클라우드 설정 관리 함수 ---
+# --- 설정 관리 ---
 def load_all_config():
     records = ws_config.get_all_records()
     cats = ['카페', '온라인', '개인', '집안일']
     h_set = {'pushup': 20, 'drink water': 4, 'take vitamins': 20}
     a_set = {'work_start': '10:00', 'work_end': '21:00'}
-    
     if records:
         temp_cats = [str(r['Value']) for r in records if r['Category'] == 'Cats']
         if temp_cats: cats = temp_cats
-        
         h_records = [r for r in records if r['Category'] == 'Health']
         if h_records: h_set = {str(r['Key']): int(r['Value']) for r in h_records}
-            
         a_records = [r for r in records if r['Category'] == 'App']
         if a_records: a_set = {str(r['Key']): str(r['Value']) for r in a_records}
-            
     return cats, h_set, a_set
 
 def save_all_config(cats, h_set, a_set):
@@ -106,7 +112,21 @@ def save_all_config(cats, h_set, a_set):
     ws_config.clear()
     ws_config.append_rows(data)
 
-# --- 세션 초기화 ---
+# 🔥 구글 시트에 진행 중인 작업 동기화 함수
+def sync_running_tasks():
+    data = [['task_id', '큰 분류', '업무분류', '업무세부분류', '작업량', 'status', 'start_time', 'last_resume_time', 'actual_seconds']]
+    for tid, t in st.session_state.tasks.items():
+        data.append([
+            tid, t['큰 분류'], t['업무분류'], t['업무세부분류'], t['작업량'],
+            t['status'], 
+            t['start_time'].strftime("%Y-%m-%d %H:%M:%S"),
+            t['last_resume_time'].strftime("%Y-%m-%d %H:%M:%S"),
+            t['actual_seconds']
+        ])
+    ws_running.clear()
+    ws_running.append_rows(data)
+
+# --- 세션 초기화 및 진행 중인 작업 복구 ---
 if 'config_loaded' not in st.session_state:
     c, h, a = load_all_config()
     st.session_state.categories = c
@@ -114,8 +134,20 @@ if 'config_loaded' not in st.session_state:
     st.session_state.app_settings = a
     st.session_state.config_loaded = True
 
+if 'tasks' not in st.session_state:
+    st.session_state.tasks = {}
+    records = ws_running.get_all_records()
+    for r in records:
+        st_time = datetime.strptime(str(r['start_time']), "%Y-%m-%d %H:%M:%S")
+        lr_time = datetime.strptime(str(r['last_resume_time']), "%Y-%m-%d %H:%M:%S")
+        st.session_state.tasks[str(r['task_id'])] = {
+            '큰 분류': str(r['큰 분류']), '업무분류': str(r['업무분류']), 
+            '업무세부분류': str(r['업무세부분류']), '작업량': int(r['작업량']),
+            'status': str(r['status']), 'start_time': st_time, 
+            'last_resume_time': lr_time, 'actual_seconds': float(r['actual_seconds'])
+        }
+
 if 'intro_shown' not in st.session_state: st.session_state.intro_shown = False
-if 'tasks' not in st.session_state: st.session_state.tasks = {}
 if 'admin_mode' not in st.session_state: st.session_state.admin_mode = False
 
 # --- 인트로 화면 ---
@@ -129,7 +161,7 @@ if not st.session_state.intro_shown:
     intro.empty() 
     st.session_state.intro_shown = True
 
-# --- 타이머 제어 ---
+# --- 타이머 제어 로직 (동기화 추가) ---
 def create_task(main_cat, task, sub_task, amount):
     task_id = str(uuid.uuid4())[:8]
     now = get_now()
@@ -137,6 +169,7 @@ def create_task(main_cat, task, sub_task, amount):
         '큰 분류': main_cat, '업무분류': task, '업무세부분류': sub_task, '작업량': amount, 
         'status': 'running', 'start_time': now, 'last_resume_time': now, 'actual_seconds': 0
     }
+    sync_running_tasks()
 
 def pause_task(task_id):
     now = get_now()
@@ -144,12 +177,14 @@ def pause_task(task_id):
     if t['status'] == 'running':
         t['actual_seconds'] += (now - t['last_resume_time']).total_seconds()
         t['status'] = 'paused'
+    sync_running_tasks()
 
 def resume_task(task_id):
     t = st.session_state.tasks[task_id]
     if t['status'] == 'paused':
         t['last_resume_time'] = get_now()
         t['status'] = 'running'
+    sync_running_tasks()
 
 def end_task(task_id):
     now = get_now()
@@ -168,6 +203,7 @@ def end_task(task_id):
         total_minutes, actual_minutes, unit_time
     ])
     del st.session_state.tasks[task_id]
+    sync_running_tasks()
 
 def log_health(item_name, earned_minutes):
     now = get_now()
@@ -195,8 +231,6 @@ if st.session_state.admin_mode:
             st.markdown("---")
             st.write("**전체 원본 데이터 (Tasks 시트)**")
             st.dataframe(df_all, use_container_width=True, height=200)
-        else:
-            st.info("아직 구글 시트에 기록된 데이터가 없습니다.")
             
     with admin_tab2:
         new_cat = st.text_input("새로운 업무 분류 추가")
@@ -253,12 +287,10 @@ else:
             m, s = divmod(int(total_seconds), 60)
             time_display = f"{m:02d}:{s:02d}"
 
-            # 🔥 완벽한 3분할 콤팩트 레이아웃 (비율 조정 및 밀림 방지)
-            c1, c2, c3 = st.columns([1.5, 1.1, 0.8])
+            c1, c2, c3 = st.columns([4.5, 3.5, 2])
             
             with c1:
-                # 텍스트가 아무리 길어도 ...으로 깔끔하게 처리되고 버튼 높이에 딱 맞게 세로 중앙 정렬
-                st.markdown(f"<div style='line-height:45px; font-size:14px; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{t_info['업무세부분류']}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='line-height:40px; font-size:14px; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{t_info['업무세부분류']}</div>", unsafe_allow_html=True)
             with c2:
                 if t_info['status'] == 'running':
                     if st.button(f"⏸️ {time_display}", key=f"p_{task_id}", use_container_width=True): 
@@ -282,7 +314,6 @@ else:
             
         with st.form("start_form"):
             main_cat = st.selectbox("큰 분류", st.session_state.categories)
-            # 🔥 폰에서 글씨가 안 잘리고 편하게 입력할 수 있도록 위아래(세로) 배치로 변경!
             task = st.text_input("업무분류 (예: 독서, 기획)")
             sub_task = st.text_input("업무세부분류 (예: 1장 읽기)")
             amount = st.number_input("목표량(개)", min_value=1, value=1, step=1)
