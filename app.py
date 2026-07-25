@@ -8,7 +8,6 @@ from google.oauth2.service_account import Credentials
 
 # --- 한국 표준시(KST) 변환 함수 ---
 def get_now():
-    # 서버 위치와 상관없이 무조건 한국 시간(KST)을 반환합니다.
     kst = timezone(timedelta(hours=9))
     return datetime.now(kst).replace(tzinfo=None)
 
@@ -237,16 +236,26 @@ else:
             st.markdown("---")
 
     with tab2:
+        # 타이머 시작 성공 메시지 (재렌더링 후 표시됨)
+        if st.session_state.get('task_started', False):
+            st.success("✅ 타이머가 시작되었습니다! '1작업중' 탭에서 확인하세요.")
+            st.session_state.task_started = False
+            
         with st.form("start_form"):
             main_cat = st.selectbox("큰 분류", st.session_state.categories)
             c1, c2 = st.columns(2)
             task = c1.text_input("업무분류")
             sub_task = c2.text_input("업무세부분류")
             amount = st.number_input("목표량(개)", min_value=1, value=1, step=1)
+            
+            # --- 수정된 부분: 시작 버튼 클릭 즉시 새로고침(rerun) 실행 ---
             if st.form_submit_button("타이머 시작"):
                 if task and sub_task:
                     create_task(main_cat, task, sub_task, amount)
-                    st.success("시작됨!")
+                    st.session_state.task_started = True  # 성공 상태 저장
+                    st.rerun()  # 화면을 강제로 다시 그려서 1번 탭을 즉시 업데이트
+                else:
+                    st.warning("업무분류와 업무세부분류를 모두 입력해주세요.")
 
     with tab3:
         health_records = ws_health.get_all_records()
@@ -293,7 +302,6 @@ else:
                         log_health(h_name2, h_time2)
                         st.rerun()
 
-    # --- 💡 탭 4: 올바른 실시간 시간 밸런스 및 순수 작업 통계 로직 ---
     with tab4:
         now = get_now()
         today_str = now.strftime("%Y-%m-%d")
