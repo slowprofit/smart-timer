@@ -47,7 +47,7 @@ st.markdown("""
         box-sizing: border-box !important;
     }
     
-    /* 3. 🔥 THE MAGIC FIX: 모든 컬럼(st.columns)을 한 줄에 수학적으로 균등 배분 */
+    /* 3. 🔥 스트림릿 최신 버전 대응: 모든 컬럼을 한 줄에 수학적으로 균등 배분 */
     @media (max-width: 768px) {
         div[data-testid="stHorizontalBlock"] {
             display: flex !important;
@@ -61,7 +61,9 @@ st.markdown("""
             padding: 0 !important;
             margin: 0 !important;
         }
-        div[data-testid="column"] {
+        /* 구 버전 column 과 최신 버전 stColumn 모두 강력 통제 */
+        div[data-testid="column"], 
+        div[data-testid="stColumn"] {
             flex: 1 1 0% !important;  /* 칸 수(3개면 1/3, 2개면 1/2)에 맞춰 알아서 나눔 */
             width: 0 !important;      /* 내용물이 아무리 커도 컨테이너 폭발 방지 */
             min-width: 0 !important;  
@@ -258,7 +260,6 @@ if st.session_state.admin_mode:
                 st.rerun()
 
     with admin_tab3:
-        # 입력창은 세로로 넓게 배치! (찌그러짐 원천 차단)
         new_h_name = st.text_input("새 항목명")
         new_h_time = st.number_input("시간(분)", min_value=1, value=10)
         if st.button("➕ 추가", key="add_health_btn", use_container_width=True) and new_h_name:
@@ -313,7 +314,6 @@ else:
             if len(display_title) > 6:
                 display_title = display_title[:6] + ".."
 
-            # 이제 3칸은 무조건 33.3%씩 평화롭게 나눠 가집니다.
             c1, c2, c3 = st.columns(3)
             with c1:
                 st.markdown(f"<div class='txt-wrap'>{display_title}</div>", unsafe_allow_html=True)
@@ -338,7 +338,6 @@ else:
             st.session_state.task_started = False
         with st.form("start_form"):
             main_cat = st.selectbox("큰 분류", st.session_state.categories)
-            # 입력창 세로 배치 유지
             task = st.text_input("업무분류 (예: 독서)")
             sub_task = st.text_input("업무세부분류 (예: 1장)")
             amount = st.number_input("목표량(개)", min_value=1, value=1, step=1)
@@ -361,7 +360,6 @@ else:
 
         items = list(st.session_state.health_settings.items())
         for i in range(0, len(items), 2):
-            # 건강 탭 2칸도 무조건 50%씩 평화롭게 나눠 가집니다.
             cols = st.columns(2)
             h_name, h_time = items[i]
             count = today_health_counts.get(h_name, 0)
