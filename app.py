@@ -64,8 +64,8 @@ st.markdown("""
         /* 구 버전 column 과 최신 버전 stColumn 모두 강력 통제 */
         div[data-testid="column"], 
         div[data-testid="stColumn"] {
-            flex: 1 1 0% !important;  /* 칸 수(3개면 1/3, 2개면 1/2)에 맞춰 알아서 나눔 */
-            width: 0 !important;      /* 내용물이 아무리 커도 컨테이너 폭발 방지 */
+            flex: 1 1 0% !important;  
+            width: 0 !important;      
             min-width: 0 !important;  
             padding: 0 !important;
             margin: 0 !important;
@@ -90,7 +90,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 구글 시트 연결 ---
+# --- 구글 시트 연결 및 워크시트 캐싱 (API 호출 최적화) ---
 @st.cache_resource
 def init_google_sheets():
     scope = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
@@ -102,20 +102,26 @@ def init_google_sheets():
     sh = gc.open('time_management')
     return sh
 
-sh = init_google_sheets()
+# 🔥 시트 4개를 매번 부르지 않고 한 번만 불러와서 메모리에 고정 (과부하 방지)
+@st.cache_resource
+def get_all_worksheets():
+    sh = init_google_sheets()
+    def get_or_create(sheet_name, headers):
+        try:
+            return sh.worksheet(sheet_name)
+        except gspread.exceptions.WorksheetNotFound:
+            ws = sh.add_worksheet(title=sheet_name, rows="1000", cols="20")
+            ws.append_row(headers)
+            return ws
+            
+    ws_tasks = get_or_create('Tasks', ['날짜', '연도', '월', '큰 분류', '업무분류', '업무세부분류', '작업량', '시작시간', '끝시간', '총 시간(분)', '실제 일한 시간(분)', '단위 소요시간(분/개)'])
+    ws_health = get_or_create('Health', ['날짜', '시간', '건강항목', '획득시간(분)'])
+    ws_config = get_or_create('Config', ['Category', 'Key', 'Value'])
+    ws_running = get_or_create('RunningTasks', ['task_id', '큰 분류', '업무분류', '업무세부분류', '작업량', 'status', 'start_time', 'last_resume_time', 'actual_seconds'])
+    
+    return ws_tasks, ws_health, ws_config, ws_running
 
-def get_or_create_sheet(sheet_name, headers):
-    try:
-        return sh.worksheet(sheet_name)
-    except gspread.exceptions.WorksheetNotFound:
-        ws = sh.add_worksheet(title=sheet_name, rows="1000", cols="20")
-        ws.append_row(headers)
-        return ws
-
-ws_tasks = get_or_create_sheet('Tasks', ['날짜', '연도', '월', '큰 분류', '업무분류', '업무세부분류', '작업량', '시작시간', '끝시간', '총 시간(분)', '실제 일한 시간(분)', '단위 소요시간(분/개)'])
-ws_health = get_or_create_sheet('Health', ['날짜', '시간', '건강항목', '획득시간(분)'])
-ws_config = get_or_create_sheet('Config', ['Category', 'Key', 'Value'])
-ws_running = get_or_create_sheet('RunningTasks', ['task_id', '큰 분류', '업무분류', '업무세부분류', '작업량', 'status', 'start_time', 'last_resume_time', 'actual_seconds'])
+ws_tasks, ws_health, ws_config, ws_running = get_all_worksheets()
 
 def load_all_config():
     records = ws_config.get_all_records()
