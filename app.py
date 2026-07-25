@@ -1,24 +1,9 @@
 import streamlit as st
 import gspread
-from google.oauth2.service_account import Credentials
 
 @st.cache_resource
 def init_google_sheets():
-    scope = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-
-    # 스트림릿 Secrets 정보를 딕셔너리로 복사
-    creds_dict = dict(st.secrets)
-
-    # private_key 양쪽의 불필요한 따옴표나 공백을 제거하고 줄바꿈 정상화
-    if "private_key" in creds_dict:
-        pk = creds_dict["private_key"]
-        pk = pk.strip().strip('"').strip("'")
-        pk = pk.replace("\\n", "\n")
-        creds_dict["private_key"] = pk
-
-    creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
-    gc = gspread.authorize(creds)
-
+    gc = gspread.service_account_from_dict(dict(st.secrets))
     sh = gc.open("SmartTimerDB")
     return sh
 
