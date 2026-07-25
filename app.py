@@ -6,12 +6,15 @@ from google.oauth2.service_account import Credentials
 def init_google_sheets():
     scope = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
 
-    # 스트림릿 Secrets에서 딕셔너리로 가져오기
+    # 스트림릿 Secrets 정보를 딕셔너리로 복사
     creds_dict = dict(st.secrets)
 
-    # private_key의 줄바꿈 문자열(\n)을 실제 줄바꿈으로 안전하게 변환
+    # private_key 양쪽의 불필요한 따옴표나 공백을 제거하고 줄바꿈 정상화
     if "private_key" in creds_dict:
-        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+        pk = creds_dict["private_key"]
+        pk = pk.strip().strip('"').strip("'")
+        pk = pk.replace("\\n", "\n")
+        creds_dict["private_key"] = pk
 
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     gc = gspread.authorize(creds)
