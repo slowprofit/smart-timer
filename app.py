@@ -11,10 +11,9 @@ def get_now():
     kst = timezone(timedelta(hours=9))
     return datetime.now(kst).replace(tzinfo=None)
 
-# --- 모바일 최적화 및 커스텀 사각 버튼 CSS ---
+# --- 모바일 최적화 CSS (버그 완벽 수정본) ---
 st.markdown("""
     <style>
-    /* 여백 최소화 */
     .block-container {
         padding-top: 3.5rem !important; 
         padding-bottom: 1rem !important;
@@ -28,7 +27,7 @@ st.markdown("""
     div[data-testid="stForm"] { padding: 10px !important; }
     h1, h2, h3 { margin-bottom: 0.2rem !important; }
     
-    /* 버튼 초소형화 */
+    /* 버튼 크기 축소 */
     .stButton>button {
         height: 40px !important; 
         white-space: nowrap !important; 
@@ -39,20 +38,26 @@ st.markdown("""
         width: 100% !important;
         min-width: 0px !important;
     }
+
+    /* 입력창이 화면 밖으로 밀어내는 현상 방지 */
+    div[data-baseweb="input"], div[data-baseweb="select"] {
+        min-width: 0 !important;
+    }
     
-    /* 🔥 1번 탭: 컬럼 절대 비율 고정 및 밀림 원천 차단 */
+    /* 🔥 핵심 수정: 어떤 탭이든(2칸이든 3칸이든) 완벽하게 N등분하여 한 줄에 고정 */
     @media (max-width: 768px) {
         div[data-testid="stHorizontalBlock"] {
             flex-direction: row !important;
             flex-wrap: nowrap !important;
             width: 100% !important;
-            gap: 2px !important;
-            overflow: hidden !important;
+            gap: 4px !important;
         }
-        /* 각 열의 너비를 %로 명확히 박아버림 (합산 100%) */
-        div[data-testid="column"]:nth-child(1) { width: 42% !important; flex: 0 0 42% !important; min-width: 0 !important; }
-        div[data-testid="column"]:nth-child(2) { width: 35% !important; flex: 0 0 35% !important; min-width: 0 !important; }
-        div[data-testid="column"]:nth-child(3) { width: 23% !important; flex: 0 0 23% !important; min-width: 0 !important; }
+        /* 이전의 악성 하드코딩(42%, 35%)을 지우고 유연한 균등 분배(flex:1)로 변경! */
+        div[data-testid="column"] {
+            flex: 1 1 0% !important; 
+            min-width: 0 !important;
+            width: auto !important;
+        }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -107,7 +112,7 @@ def save_all_config(cats, h_set, a_set):
     ws_config.clear()
     ws_config.append_rows(data)
 
-# 🔥 구글 시트에 진행 중인 작업 동기화 함수
+# --- 진행 중인 작업 동기화 함수 ---
 def sync_running_tasks():
     data = [['task_id', '큰 분류', '업무분류', '업무세부분류', '작업량', 'status', 'start_time', 'last_resume_time', 'actual_seconds']]
     for tid, t in st.session_state.tasks.items():
@@ -121,7 +126,7 @@ def sync_running_tasks():
     ws_running.clear()
     ws_running.append_rows(data)
 
-# --- 세션 초기화 및 진행 중인 작업 복구 ---
+# --- 세션 초기화 ---
 if 'config_loaded' not in st.session_state:
     c, h, a = load_all_config()
     st.session_state.categories = c
@@ -223,7 +228,7 @@ if st.session_state.admin_mode:
             save_all_config(st.session_state.categories, st.session_state.health_settings, st.session_state.app_settings)
             st.rerun()
         for cat in st.session_state.categories:
-            c1, c2 = st.columns([8, 2])
+            c1, c2 = st.columns(2)
             c1.write(f"- {cat}")
             if c2.button("❌", key=f"del_cat_{cat}"):
                 st.session_state.categories.remove(cat)
@@ -231,17 +236,17 @@ if st.session_state.admin_mode:
                 st.rerun()
 
     with admin_tab3:
-        hc1, hc2, hc3 = st.columns([4, 4, 2])
+        hc1, hc2, hc3 = st.columns(3)
         new_h_name = hc1.text_input("항목명")
         new_h_time = hc2.number_input("시간(분)", min_value=1, value=10)
-        if hc3.button("➕") and new_h_name:
+        if hc3.button("➕ 추가") and new_h_name:
             st.session_state.health_settings[new_h_name] = new_h_time
             save_all_config(st.session_state.categories, st.session_state.health_settings, st.session_state.app_settings)
             st.rerun()
         for h_name, h_time in st.session_state.health_settings.items():
-            cc1, cc2 = st.columns([8, 2])
+            cc1, cc2 = st.columns(2)
             cc1.write(f"**{h_name}** / **{h_time}분**")
-            if cc2.button("❌", key=f"del_h_{h_name}"):
+            if cc2.button("❌ 삭제", key=f"del_h_{h_name}"):
                 del st.session_state.health_settings[h_name]
                 save_all_config(st.session_state.categories, st.session_state.health_settings, st.session_state.app_settings)
                 st.rerun()
@@ -259,7 +264,6 @@ if st.session_state.admin_mode:
 # 2. 메인 화면 
 # ==========================================
 else:
-    # 인트로 화면 표출
     if not st.session_state.intro_shown:
         intro = st.empty()
         with intro.container():
@@ -282,15 +286,16 @@ else:
             m, s = divmod(int(total_seconds), 60)
             time_display = f"{m:02d}:{s:02d}"
 
-            # 🔥 아이디어 적용: 텍스트가 8글자를 초과하면 잘라내고 '..' 붙이기
+            # 🔥 글자 수 6글자 제한 (안전장치)
             display_title = t_info['업무세부분류']
-            if len(display_title) > 8:
-                display_title = display_title[:8] + ".."
+            if len(display_title) > 6:
+                display_title = display_title[:6] + ".."
 
-            c1, c2, c3 = st.columns([42, 35, 23])
+            # теперь 모든 컬럼이 동등한 1/3 비율을 갖습니다.
+            c1, c2, c3 = st.columns(3)
             
             with c1:
-                st.markdown(f"<div style='line-height:40px; font-size:14px; font-weight:bold;'>{display_title}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='display:flex; align-items:center; justify-content:center; height:40px; font-size:14px; font-weight:bold;'>{display_title}</div>", unsafe_allow_html=True)
             with c2:
                 if t_info['status'] == 'running':
                     if st.button(f"⏸️ {time_display}", key=f"p_{task_id}", use_container_width=True): 
@@ -400,9 +405,9 @@ else:
         balance_mins = earned_time - elapsed_mins
         
         if balance_mins < 0:
-            st.error(f"🚨 **시간 부족 경고!** 아침부터 흐른 시간({elapsed_mins}분)보다 운동으로 번 시간({earned_time}분)이 적습니다. (부족: {abs(balance_mins)}분)")
+            st.error(f"🚨 **시간 부족 경고!** 흐른 시간({elapsed_mins}분)보다 운동으로 번 시간({earned_time}분)이 적습니다. (부족: {abs(balance_mins)}분)")
         else:
-            st.success(f"✨ **밸런스 굿!** 여유 시간 **{balance_mins}분** 남았습니다. (오늘 총 업무 노동 시간: {spent_work_time}분)")
+            st.success(f"✨ **밸런스 굿!** 여유 시간 **{balance_mins}분** 남았습니다. (오늘 업무 노동: {spent_work_time}분)")
         
         overview_df = pd.DataFrame({
             '지표': ['1. 경과 시간', '2. 운동 확보', '3. 업무 노동'],
