@@ -1,10 +1,16 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import uuid
 import time
 import gspread
 from google.oauth2.service_account import Credentials
+
+# --- 한국 표준시(KST) 변환 함수 ---
+def get_now():
+    # 서버 위치와 상관없이 무조건 한국 시간(KST)을 반환합니다.
+    kst = timezone(timedelta(hours=9))
+    return datetime.now(kst).replace(tzinfo=None)
 
 # --- 모바일 최적화 및 커스텀 사각 버튼 CSS ---
 st.markdown("""
@@ -107,14 +113,14 @@ if not st.session_state.intro_shown:
 # --- 타이머 제어 ---
 def create_task(main_cat, task, sub_task, amount):
     task_id = str(uuid.uuid4())[:8]
-    now = datetime.now()
+    now = get_now()
     st.session_state.tasks[task_id] = {
         '큰 분류': main_cat, '업무분류': task, '업무세부분류': sub_task, '작업량': amount, 
         'status': 'running', 'start_time': now, 'last_resume_time': now, 'actual_seconds': 0
     }
 
 def pause_task(task_id):
-    now = datetime.now()
+    now = get_now()
     t = st.session_state.tasks[task_id]
     if t['status'] == 'running':
         t['actual_seconds'] += (now - t['last_resume_time']).total_seconds()
@@ -123,11 +129,11 @@ def pause_task(task_id):
 def resume_task(task_id):
     t = st.session_state.tasks[task_id]
     if t['status'] == 'paused':
-        t['last_resume_time'] = datetime.now()
+        t['last_resume_time'] = get_now()
         t['status'] = 'running'
 
 def end_task(task_id):
-    now = datetime.now()
+    now = get_now()
     t = st.session_state.tasks[task_id]
     if t['status'] == 'running':
         t['actual_seconds'] += (now - t['last_resume_time']).total_seconds()
@@ -145,7 +151,7 @@ def end_task(task_id):
     del st.session_state.tasks[task_id]
 
 def log_health(item_name, earned_minutes):
-    now = datetime.now()
+    now = get_now()
     ws_health.append_row([
         now.strftime("%Y-%m-%d"), now.strftime("%H:%M:%S"),
         item_name, earned_minutes
@@ -246,7 +252,7 @@ else:
         health_records = ws_health.get_all_records()
         hdf = pd.DataFrame(health_records) if health_records else pd.DataFrame(columns=['날짜', '시간', '건강항목', '획득시간(분)'])
         
-        today_str = datetime.now().strftime("%Y-%m-%d")
+        today_str = get_now().strftime("%Y-%m-%d")
         today_health_counts = {}
         if not hdf.empty:
             hdf_today = hdf[hdf['날짜'] == today_str]
@@ -289,7 +295,8 @@ else:
 
     # --- 💡 탭 4: 올바른 실시간 시간 밸런스 및 순수 작업 통계 로직 ---
     with tab4:
-        now = datetime.now()
+        now = get_now()
+        today_str = now.strftime("%Y-%m-%d")
         start_str, end_str = st.session_state.app_settings['work_start'], st.session_state.app_settings['work_end']
         start_dt = datetime.strptime(f"{today_str} {start_str}", "%Y-%m-%d %H:%M")
         end_dt = datetime.strptime(f"{today_str} {end_str}", "%Y-%m-%d %H:%M")
@@ -308,7 +315,7 @@ else:
             hdf_today = hdf[hdf['날짜'] == today_str]
             if not hdf_today.empty: earned_time = int(hdf_today['획득시간(분)'].sum())
 
-        # 3. 순수 업무에 쓴 시간 계산 (밸런스 차감용이 아닌, 오늘 내가 일한 총량)
+        # 3. 순수 업무에 쓴 시간 계산
         task_records = ws_tasks.get_all_records()
         tdf = pd.DataFrame(task_records) if task_records else pd.DataFrame(columns=['날짜', '끝시간', '실제 일한 시간(분)'])
         spent_work_time = 0
@@ -316,7 +323,7 @@ else:
             tdf_today = tdf[tdf['날짜'] == today_str]
             if not tdf_today.empty: spent_work_time = int(tdf_today['실제 일한 시간(분)'].sum())
 
-        # 4. 잔여 시간 계산: (운동으로 번 시간) - (아침부터 흐른 시간)
+        # 4. 잔여 시간 계산
         balance_mins = earned_time - elapsed_mins
         
         if balance_mins < 0:
@@ -324,14 +331,14 @@ else:
         else:
             st.success(f"✨ **밸런스 굿!** 여유 시간 **{balance_mins}분** 남았습니다. (오늘 총 업무 노동 시간: {spent_work_time}분)")
         
-        # 5. 상단 막대그래프: [경과 시간, 운동 확보 시간, 오늘 총 업무 시간] 비교
+        # 5. 상단 막대그래프
         overview_df = pd.DataFrame({
             '지표': ['1. 경과 시간', '2. 운동 확보', '3. 업무 노동'],
             '시간(분)': [elapsed_mins, earned_time, spent_work_time]
         }).set_index('지표')
         st.bar_chart(overview_df, height=150)
 
-        # 6. 시간대별 꺾은선 그래프 (운동 vs 순수 업무)
+        # 6. 시간대별 꺾은선 그래프
         hours_list = [f"{h:02d}시" for h in range(7, 24)]
         hourly_df = pd.DataFrame(index=hours_list, columns=['운동', '업무']).fillna(0)
         
