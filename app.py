@@ -11,15 +11,14 @@ def get_now():
     kst = timezone(timedelta(hours=9))
     return datetime.now(kst).replace(tzinfo=None)
 
-# --- 모바일 최적화 CSS (망가짐 완벽 해결본) ---
+# --- 🔥 모바일 레이아웃 절대 방어 CSS ---
 st.markdown("""
     <style>
-    /* 전체 여백 최소화 */
     .block-container {
         padding-top: 3.5rem !important; 
         padding-bottom: 1rem !important;
-        padding-left: 0.3rem !important;
-        padding-right: 0.3rem !important;
+        padding-left: 0.2rem !important;
+        padding-right: 0.2rem !important;
         max-width: 100vw !important;
         overflow-x: hidden !important; 
     }
@@ -28,19 +27,17 @@ st.markdown("""
     div[data-testid="stForm"] { padding: 10px !important; }
     h1, h2, h3 { margin-bottom: 0.2rem !important; }
     
-    /* 🔥 버튼 설정: 가로로 화면을 찢지 않도록 줄바꿈(pre-wrap) 전면 허용! */
     .stButton>button {
         height: auto !important; 
-        min-height: 50px !important; 
+        min-height: 45px !important; 
         white-space: pre-wrap !important; 
-        word-break: break-word !important; 
+        word-break: keep-all !important;
         border-radius: 8px !important;
         font-weight: bold;
         font-size: 12px !important;
         padding: 4px !important; 
         width: 100% !important;
         min-width: 0px !important;
-        line-height: 1.3 !important;
     }
 
     div[data-baseweb="input"], div[data-baseweb="select"] {
@@ -48,23 +45,24 @@ st.markdown("""
         width: 100% !important;
     }
     
-    /* 1번, 3번 탭 등 st.columns를 쓴 곳은 가로로 유지하되 절대 화면 밖으로 나가지 않게 고정 */
+    /* 🔥 더 강력한 모바일 3분할 강제 고정 CSS */
     @media (max-width: 768px) {
-        div[data-testid="stHorizontalBlock"] {
+        [data-testid="stHorizontalBlock"] {
             flex-direction: row !important;
             flex-wrap: nowrap !important;
             width: 100% !important;
             gap: 4px !important;
-            overflow: hidden !important;
         }
-        div[data-testid="column"] {
+        [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+            width: 33% !important;
+            flex: 1 1 33% !important;
             min-width: 0 !important;
         }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 구글 스프레드시트 연결 함수 ---
+# --- 구글 시트 연결 ---
 @st.cache_resource
 def init_google_sheets():
     scope = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
@@ -89,7 +87,6 @@ def get_or_create_sheet(sheet_name, headers):
 ws_tasks = get_or_create_sheet('Tasks', ['날짜', '연도', '월', '큰 분류', '업무분류', '업무세부분류', '작업량', '시작시간', '끝시간', '총 시간(분)', '실제 일한 시간(분)', '단위 소요시간(분/개)'])
 ws_health = get_or_create_sheet('Health', ['날짜', '시간', '건강항목', '획득시간(분)'])
 ws_config = get_or_create_sheet('Config', ['Category', 'Key', 'Value'])
-# 🔥 새로고침 방어용 실시간 시트 부활
 ws_running = get_or_create_sheet('RunningTasks', ['task_id', '큰 분류', '업무분류', '업무세부분류', '작업량', 'status', 'start_time', 'last_resume_time', 'actual_seconds'])
 
 def load_all_config():
@@ -114,7 +111,6 @@ def save_all_config(cats, h_set, a_set):
     ws_config.clear()
     ws_config.append_rows(data)
 
-# 실시간 시트 저장 함수 (새로고침 방어)
 def sync_running_tasks():
     data = [['task_id', '큰 분류', '업무분류', '업무세부분류', '작업량', 'status', 'start_time', 'last_resume_time', 'actual_seconds']]
     for tid, t in st.session_state.tasks.items():
@@ -135,7 +131,6 @@ if 'config_loaded' not in st.session_state:
     st.session_state.app_settings = a
     st.session_state.config_loaded = True
 
-# 기존 작업 불러오기 (새로고침 방어)
 if 'tasks' not in st.session_state:
     st.session_state.tasks = {}
     records = ws_running.get_all_records()
@@ -221,9 +216,9 @@ if st.session_state.admin_mode:
             st.dataframe(df_all, use_container_width=True, height=200)
             
     with admin_tab2:
-        # 🔥 입력창을 한 줄이 아닌 시원한 세로 배치로 변경!
         new_cat = st.text_input("새로운 업무 분류 추가")
-        if st.button("➕ 추가", use_container_width=True) and new_cat not in st.session_state.categories:
+        # 🔥 에러 원인 해결: 고유 키(key="add_cat_btn") 부여
+        if st.button("➕ 추가", key="add_cat_btn", use_container_width=True) and new_cat not in st.session_state.categories:
             st.session_state.categories.append(new_cat)
             save_all_config(st.session_state.categories, st.session_state.health_settings, st.session_state.app_settings)
             st.rerun()
@@ -238,10 +233,10 @@ if st.session_state.admin_mode:
                 st.rerun()
 
     with admin_tab3:
-        # 🔥 건강 항목 추가도 시원한 세로 배치로 변경!
         new_h_name = st.text_input("새 항목명")
         new_h_time = st.number_input("시간(분)", min_value=1, value=10)
-        if st.button("➕ 추가", use_container_width=True) and new_h_name:
+        # 🔥 에러 원인 해결: 고유 키(key="add_health_btn") 부여
+        if st.button("➕ 추가", key="add_health_btn", use_container_width=True) and new_h_name:
             st.session_state.health_settings[new_h_name] = new_h_time
             save_all_config(st.session_state.categories, st.session_state.health_settings, st.session_state.app_settings)
             st.rerun()
@@ -258,7 +253,7 @@ if st.session_state.admin_mode:
     with admin_tab4:
         w_start = st.text_input("시작 (HH:MM)", value=st.session_state.app_settings['work_start'])
         w_end = st.text_input("종료 (HH:MM)", value=st.session_state.app_settings['work_end'])
-        if st.button("💾 클라우드에 저장", use_container_width=True):
+        if st.button("💾 클라우드에 저장", key="save_app_settings", use_container_width=True):
             st.session_state.app_settings['work_start'] = w_start
             st.session_state.app_settings['work_end'] = w_end
             save_all_config(st.session_state.categories, st.session_state.health_settings, st.session_state.app_settings)
@@ -289,18 +284,14 @@ else:
             m, s = divmod(int(total_seconds), 60)
             time_display = f"{m:02d}:{s:02d}"
 
-            # 글씨 6자 제한 (안전장치)
             display_title = t_info['업무세부분류']
             if len(display_title) > 6:
                 display_title = display_title[:6] + ".."
 
-            # 비율을 살리되 모바일에서 밀리지 않게 고정
-            c1, c2, c3 = st.columns([4, 3, 3])
-            
+            c1, c2, c3 = st.columns([3, 3, 3])
             with c1:
-                st.markdown(f"<div style='display:flex; align-items:center; height:100%; min-height:50px; font-size:13px; font-weight:bold;'>{display_title}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='display:flex; align-items:center; justify-content:center; height:100%; min-height:45px; font-size:13px; font-weight:bold;'>{display_title}</div>", unsafe_allow_html=True)
             with c2:
-                # 버튼 내에서 아이콘과 텍스트를 위아래 2줄(\n)로 분리하여 공간 절약!
                 if t_info['status'] == 'running':
                     if st.button(f"⏸️\n{time_display}", key=f"p_{task_id}", use_container_width=True): 
                         pause_task(task_id)
@@ -313,21 +304,17 @@ else:
                 if st.button("⏹️\n저장", key=f"e_{task_id}", use_container_width=True): 
                     end_task(task_id)
                     st.rerun()
-            
             st.markdown("---")
 
     with tab2:
         if st.session_state.get('task_started', False):
             st.success("✅ 타이머 시작! '1작업중' 탭을 보세요.")
             st.session_state.task_started = False
-            
         with st.form("start_form"):
             main_cat = st.selectbox("큰 분류", st.session_state.categories)
-            # 🔥 모바일에서 잘리지 않도록 세로로 분리 배치!
             task = st.text_input("업무분류 (예: 독서)")
-            sub_task = st.text_input("업무세부분류 (예: 1장 읽기)")
+            sub_task = st.text_input("업무세부분류 (예: 1장)")
             amount = st.number_input("목표량(개)", min_value=1, value=1, step=1)
-            
             if st.form_submit_button("🚀 타이머 시작", use_container_width=True):
                 if task and sub_task:
                     create_task(main_cat, task, sub_task, amount)
@@ -339,7 +326,6 @@ else:
     with tab3:
         health_records = ws_health.get_all_records()
         hdf = pd.DataFrame(health_records) if health_records else pd.DataFrame(columns=['날짜', '시간', '건강항목', '획득시간(분)'])
-        
         today_str = get_now().strftime("%Y-%m-%d")
         today_health_counts = {}
         if not hdf.empty:
@@ -348,34 +334,29 @@ else:
 
         items = list(st.session_state.health_settings.items())
         for i in range(0, len(items), 2):
-            cols = st.columns(2)
+            cols = st.columns([5, 5])
             h_name, h_time = items[i]
             count = today_health_counts.get(h_name, 0)
             is_vitamin = "비타민" in h_name or "vitamin" in h_name.lower()
-            
             with cols[0]:
                 if is_vitamin:
-                    if count >= 1: btn_label, is_disabled = f"✅ {h_name}\n[완료됨]", True
+                    if count >= 1: btn_label, is_disabled = f"✅ {h_name}\n[완료]", True
                     else: btn_label, is_disabled = f"💊 {h_name}\n(+{h_time}분)", False
                 else:
                     btn_label, is_disabled = f"{h_name}\n{count}회 " + ("🟦" * count), False
-                    
                 if st.button(btn_label, key=f"do_{h_name}", disabled=is_disabled, use_container_width=True):
                     log_health(h_name, h_time)
                     st.rerun()
-            
             if i + 1 < len(items):
                 h_name2, h_time2 = items[i + 1]
                 count2 = today_health_counts.get(h_name2, 0)
                 is_vitamin2 = "비타민" in h_name2 or "vitamin" in h_name2.lower()
-                
                 with cols[1]:
                     if is_vitamin2:
-                        if count2 >= 1: btn_label2, is_disabled2 = f"✅ {h_name2}\n[완료됨]", True
+                        if count2 >= 1: btn_label2, is_disabled2 = f"✅ {h_name2}\n[완료]", True
                         else: btn_label2, is_disabled2 = f"💊 {h_name2}\n(+{h_time2}분)", False
                     else:
                         btn_label2, is_disabled2 = f"{h_name2}\n{count2}회 " + ("🟦" * count2), False
-                        
                     if st.button(btn_label2, key=f"do_{h_name2}", disabled=is_disabled2, use_container_width=True):
                         log_health(h_name2, h_time2)
                         st.rerun()
@@ -387,7 +368,6 @@ else:
         start_dt = datetime.strptime(f"{today_str} {start_str}", "%Y-%m-%d %H:%M")
         end_dt = datetime.strptime(f"{today_str} {end_str}", "%Y-%m-%d %H:%M")
         total_window_mins = max(1, int((end_dt - start_dt).total_seconds() / 60))
-        
         if now < start_dt: elapsed_mins = 0
         elif now > end_dt: elapsed_mins = total_window_mins
         else: elapsed_mins = int((now - start_dt).total_seconds() / 60)
@@ -407,7 +387,6 @@ else:
             if not tdf_today.empty: spent_work_time = int(tdf_today['실제 일한 시간(분)'].sum())
 
         balance_mins = earned_time - elapsed_mins
-        
         if balance_mins < 0:
             st.error(f"🚨 **시간 부족!** 번 시간({earned_time}분) 부족: {abs(balance_mins)}분")
         else:
@@ -416,22 +395,7 @@ else:
         overview_df = pd.DataFrame({'지표': ['1. 경과 시간', '2. 운동 확보', '3. 업무 노동'], '시간(분)': [elapsed_mins, earned_time, spent_work_time]}).set_index('지표')
         st.bar_chart(overview_df, height=150)
 
-        hours_list = [f"{h:02d}시" for h in range(7, 24)]
-        hourly_df = pd.DataFrame(index=hours_list, columns=['운동', '업무']).fillna(0)
-        
-        if not hdf.empty and not hdf_today.empty:
-            for _, row in hdf_today.iterrows():
-                h_hour = int(str(row['시간']).split(':')[0])
-                if 7 <= h_hour <= 23: hourly_df.at[f"{h_hour:02d}시", '운동'] += int(row['획득시간(분)'])
-                    
-        if not tdf.empty and not tdf_today.empty:
-            for _, row in tdf_today.iterrows():
-                w_hour = int(str(row['끝시간']).split(':')[0])
-                if 7 <= w_hour <= 23: hourly_df.at[f"{w_hour:02d}시", '업무'] += int(row['실제 일한 시간(분)'])
-        
-        st.line_chart(hourly_df, height=150)
-
 st.markdown("---")
-if st.button("⚙️ 관리자 모드 열기/닫기", use_container_width=True):
+if st.button("⚙️ 관리자 모드 열기/닫기", key="toggle_admin_mode", use_container_width=True):
     st.session_state.admin_mode = not st.session_state.admin_mode
     st.rerun()
