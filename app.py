@@ -14,7 +14,7 @@ def get_now():
 # --- 모바일 최적화 및 커스텀 사각 버튼 CSS ---
 st.markdown("""
     <style>
-    /* 여백을 극한으로 줄여서 모바일 화면 낭비 최소화 */
+    /* 여백 최소화 */
     .block-container {
         padding-top: 3.5rem !important; 
         padding-bottom: 1rem !important;
@@ -28,7 +28,7 @@ st.markdown("""
     div[data-testid="stForm"] { padding: 10px !important; }
     h1, h2, h3 { margin-bottom: 0.2rem !important; }
     
-    /* 버튼 초소형화 (텍스트 길이에 맞춰 찌그러지지 않게) */
+    /* 버튼 초소형화 */
     .stButton>button {
         height: 40px !important; 
         white-space: nowrap !important; 
@@ -40,23 +40,19 @@ st.markdown("""
         min-width: 0px !important;
     }
     
-    /* 🔥 1번 탭: 컬럼 강제 가로 배치 및 가로 스크롤 절대 차단 */
+    /* 🔥 1번 탭: 컬럼 절대 비율 고정 및 밀림 원천 차단 */
     @media (max-width: 768px) {
         div[data-testid="stHorizontalBlock"] {
             flex-direction: row !important;
             flex-wrap: nowrap !important;
             width: 100% !important;
-            gap: 4px !important;
+            gap: 2px !important;
             overflow: hidden !important;
         }
-        div[data-testid="column"] {
-            width: auto !important;
-            min-width: 0 !important;
-        }
-        /* 각 열의 너비 비율 강제 고정 (작업명 4.5 : 멈춤 3.5 : 저장 2) */
-        div[data-testid="column"]:nth-child(1) { flex: 4.5 !important; }
-        div[data-testid="column"]:nth-child(2) { flex: 3.5 !important; }
-        div[data-testid="column"]:nth-child(3) { flex: 2 !important; }
+        /* 각 열의 너비를 %로 명확히 박아버림 (합산 100%) */
+        div[data-testid="column"]:nth-child(1) { width: 42% !important; flex: 0 0 42% !important; min-width: 0 !important; }
+        div[data-testid="column"]:nth-child(2) { width: 35% !important; flex: 0 0 35% !important; min-width: 0 !important; }
+        div[data-testid="column"]:nth-child(3) { width: 23% !important; flex: 0 0 23% !important; min-width: 0 !important; }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -86,7 +82,6 @@ def get_or_create_sheet(sheet_name, headers):
 ws_tasks = get_or_create_sheet('Tasks', ['날짜', '연도', '월', '큰 분류', '업무분류', '업무세부분류', '작업량', '시작시간', '끝시간', '총 시간(분)', '실제 일한 시간(분)', '단위 소요시간(분/개)'])
 ws_health = get_or_create_sheet('Health', ['날짜', '시간', '건강항목', '획득시간(분)'])
 ws_config = get_or_create_sheet('Config', ['Category', 'Key', 'Value'])
-# 🔥 진행 중인 작업을 영구 저장하는 시트 추가 (새로고침 방어용)
 ws_running = get_or_create_sheet('RunningTasks', ['task_id', '큰 분류', '업무분류', '업무세부분류', '작업량', 'status', 'start_time', 'last_resume_time', 'actual_seconds'])
 
 # --- 설정 관리 ---
@@ -150,18 +145,7 @@ if 'tasks' not in st.session_state:
 if 'intro_shown' not in st.session_state: st.session_state.intro_shown = False
 if 'admin_mode' not in st.session_state: st.session_state.admin_mode = False
 
-# --- 인트로 화면 ---
-if not st.session_state.intro_shown:
-    intro = st.empty()
-    with intro.container():
-        st.markdown("<br><br><br><br><br>", unsafe_allow_html=True)
-        st.markdown("<h2 style='text-align: center; color: #4A4A4A;'>⏱️ 스마트 밸런스 타이머</h2>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center; color: #888;'>Created by <b>Minu Minu</b></p>", unsafe_allow_html=True)
-    time.sleep(1.5) 
-    intro.empty() 
-    st.session_state.intro_shown = True
-
-# --- 타이머 제어 로직 (동기화 추가) ---
+# --- 타이머 제어 로직 ---
 def create_task(main_cat, task, sub_task, amount):
     task_id = str(uuid.uuid4())[:8]
     now = get_now()
@@ -275,6 +259,17 @@ if st.session_state.admin_mode:
 # 2. 메인 화면 
 # ==========================================
 else:
+    # 인트로 화면 표출
+    if not st.session_state.intro_shown:
+        intro = st.empty()
+        with intro.container():
+            st.markdown("<br><br><br><br><br>", unsafe_allow_html=True)
+            st.markdown("<h2 style='text-align: center; color: #4A4A4A;'>⏱️ 스마트 밸런스 타이머</h2>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center; color: #888;'>Created by <b>Minu Minu</b></p>", unsafe_allow_html=True)
+        time.sleep(1.5) 
+        intro.empty() 
+        st.session_state.intro_shown = True
+
     tab1, tab2, tab3, tab4 = st.tabs(["▶️ 1작업중", "📝 2작업", "💪 3건강", "📊 4통계"])
     
     with tab1:
@@ -287,10 +282,15 @@ else:
             m, s = divmod(int(total_seconds), 60)
             time_display = f"{m:02d}:{s:02d}"
 
-            c1, c2, c3 = st.columns([4.5, 3.5, 2])
+            # 🔥 아이디어 적용: 텍스트가 8글자를 초과하면 잘라내고 '..' 붙이기
+            display_title = t_info['업무세부분류']
+            if len(display_title) > 8:
+                display_title = display_title[:8] + ".."
+
+            c1, c2, c3 = st.columns([42, 35, 23])
             
             with c1:
-                st.markdown(f"<div style='line-height:40px; font-size:14px; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{t_info['업무세부분류']}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='line-height:40px; font-size:14px; font-weight:bold;'>{display_title}</div>", unsafe_allow_html=True)
             with c2:
                 if t_info['status'] == 'running':
                     if st.button(f"⏸️ {time_display}", key=f"p_{task_id}", use_container_width=True): 
