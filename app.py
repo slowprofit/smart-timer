@@ -14,38 +14,39 @@ def get_now():
 # --- 모바일 최적화 및 커스텀 사각 버튼 CSS ---
 st.markdown("""
     <style>
-    /* 전체 화면 여백 최소화 및 가로 스크롤 원천 차단 */
     .block-container {
         padding-top: 3.5rem !important; 
         padding-bottom: 1rem !important;
         padding-left: 0.5rem !important;
         padding-right: 0.5rem !important;
-        max-width: 100% !important;
-        overflow-x: hidden !important; 
+        max-width: 100vw !important;
     }
-    .stTabs [data-baseweb="tab-list"] { gap: 5px; }
-    .stTabs [data-baseweb="tab"] { padding: 10px 10px !important; font-size: 14px !important; }
+    .stTabs [data-baseweb="tab-list"] { gap: 3px; }
+    .stTabs [data-baseweb="tab"] { padding: 8px 6px !important; font-size: 13px !important; }
     div[data-testid="stForm"] { padding: 10px !important; }
     h1, h2, h3 { margin-bottom: 0.2rem !important; }
     
-    /* 버튼 크기를 텍스트에 딱 맞게 축소 (콤팩트 사이즈) */
+    /* 모바일 맞춤형 콤팩트 버튼 (글자가 잘리지 않고 줄어듦) */
     .stButton>button {
-        height: 50px !important; 
+        height: 45px !important; 
         white-space: nowrap !important; 
         border-radius: 8px !important;
         font-weight: bold;
         font-size: 13px !important;
-        padding: 0px 4px !important; 
+        padding: 0px 2px !important; 
+        width: 100% !important;
+        min-width: 0px !important;
     }
     
-    /* 모바일 환경에서 컬럼이 깨지지 않도록 강제 1줄 배치 */
+    /* 🔥 컬럼 강제 가로 배치 (화면 밖으로 밀려남 방지) */
     @media (max-width: 768px) {
         div[data-testid="stHorizontalBlock"] {
-            flex-direction: row !important;
             flex-wrap: nowrap !important;
             gap: 4px !important;
+            overflow: hidden !important;
         }
         div[data-testid="column"] {
+            width: auto !important;
             min-width: 0 !important;
         }
     }
@@ -124,7 +125,7 @@ if not st.session_state.intro_shown:
         st.markdown("<br><br><br><br><br>", unsafe_allow_html=True)
         st.markdown("<h2 style='text-align: center; color: #4A4A4A;'>⏱️ 스마트 밸런스 타이머</h2>", unsafe_allow_html=True)
         st.markdown("<p style='text-align: center; color: #888;'>Created by <b>Minu Minu</b></p>", unsafe_allow_html=True)
-    time.sleep(2.5) 
+    time.sleep(1.5) 
     intro.empty() 
     st.session_state.intro_shown = True
 
@@ -179,7 +180,7 @@ def log_health(item_name, earned_minutes):
 # 1. 관리자 화면 
 # ==========================================
 if st.session_state.admin_mode:
-    st.subheader("⚙️ 관리자 메뉴 (Google Sheets 연동됨)")
+    st.subheader("⚙️ 관리자 메뉴")
     admin_tab1, admin_tab2, admin_tab3, admin_tab4 = st.tabs(["📂 데이터", "🏷️ 분류", "💪 건강", "⏰ 시간"])
     
     with admin_tab1:
@@ -245,7 +246,6 @@ else:
     with tab1:
         if not st.session_state.tasks: st.info("실행 중인 작업이 없습니다.")
         for task_id, t_info in list(st.session_state.tasks.items()):
-            # --- 실시간 누적 시간 계산 ---
             total_seconds = t_info['actual_seconds']
             if t_info['status'] == 'running':
                 total_seconds += (get_now() - t_info['last_resume_time']).total_seconds()
@@ -253,12 +253,12 @@ else:
             m, s = divmod(int(total_seconds), 60)
             time_display = f"{m:02d}:{s:02d}"
 
-            # 🔥 황금 비율 설정: 텍스트(55%) | 멈춤버튼(27%) | 저장버튼(18%)
-            c1, c2, c3 = st.columns([55, 27, 18])
+            # 🔥 완벽한 3분할 콤팩트 레이아웃 (비율 조정 및 밀림 방지)
+            c1, c2, c3 = st.columns([1.5, 1.1, 0.8])
             
             with c1:
-                # 텍스트가 너무 길면 자동으로 ... 처리되도록 방어막 추가
-                st.markdown(f"<div style='padding-top:14px; font-size:14px; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{t_info['업무세부분류']}</div>", unsafe_allow_html=True)
+                # 텍스트가 아무리 길어도 ...으로 깔끔하게 처리되고 버튼 높이에 딱 맞게 세로 중앙 정렬
+                st.markdown(f"<div style='line-height:45px; font-size:14px; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{t_info['업무세부분류']}</div>", unsafe_allow_html=True)
             with c2:
                 if t_info['status'] == 'running':
                     if st.button(f"⏸️ {time_display}", key=f"p_{task_id}", use_container_width=True): 
@@ -269,7 +269,6 @@ else:
                         resume_task(task_id)
                         st.rerun()
             with c3:
-                # 저장 버튼은 글자가 작으므로 가장 좁은 공간을 할당
                 if st.button("⏹️ 저장", key=f"e_{task_id}", use_container_width=True): 
                     end_task(task_id)
                     st.rerun()
@@ -283,12 +282,12 @@ else:
             
         with st.form("start_form"):
             main_cat = st.selectbox("큰 분류", st.session_state.categories)
-            c1, c2 = st.columns(2)
-            task = c1.text_input("업무분류")
-            sub_task = c2.text_input("업무세부분류")
+            # 🔥 폰에서 글씨가 안 잘리고 편하게 입력할 수 있도록 위아래(세로) 배치로 변경!
+            task = st.text_input("업무분류 (예: 독서, 기획)")
+            sub_task = st.text_input("업무세부분류 (예: 1장 읽기)")
             amount = st.number_input("목표량(개)", min_value=1, value=1, step=1)
             
-            if st.form_submit_button("타이머 시작"):
+            if st.form_submit_button("🚀 타이머 시작", use_container_width=True):
                 if task and sub_task:
                     create_task(main_cat, task, sub_task, amount)
                     st.session_state.task_started = True 
@@ -349,12 +348,10 @@ else:
         end_dt = datetime.strptime(f"{today_str} {end_str}", "%Y-%m-%d %H:%M")
         total_window_mins = max(1, int((end_dt - start_dt).total_seconds() / 60))
         
-        # 1. 아침 10시부터 현재 시각까지 흐른 실시간 경과 시간 계산
         if now < start_dt: elapsed_mins = 0
         elif now > end_dt: elapsed_mins = total_window_mins
         else: elapsed_mins = int((now - start_dt).total_seconds() / 60)
 
-        # 2. 운동으로 확보한 총 시간 계산
         health_records = ws_health.get_all_records()
         hdf = pd.DataFrame(health_records) if health_records else pd.DataFrame(columns=['날짜', '시간', '건강항목', '획득시간(분)'])
         earned_time = 0
@@ -362,7 +359,6 @@ else:
             hdf_today = hdf[hdf['날짜'] == today_str]
             if not hdf_today.empty: earned_time = int(hdf_today['획득시간(분)'].sum())
 
-        # 3. 순수 업무에 쓴 시간 계산
         task_records = ws_tasks.get_all_records()
         tdf = pd.DataFrame(task_records) if task_records else pd.DataFrame(columns=['날짜', '끝시간', '실제 일한 시간(분)'])
         spent_work_time = 0
@@ -370,7 +366,6 @@ else:
             tdf_today = tdf[tdf['날짜'] == today_str]
             if not tdf_today.empty: spent_work_time = int(tdf_today['실제 일한 시간(분)'].sum())
 
-        # 4. 잔여 시간 계산
         balance_mins = earned_time - elapsed_mins
         
         if balance_mins < 0:
@@ -378,14 +373,12 @@ else:
         else:
             st.success(f"✨ **밸런스 굿!** 여유 시간 **{balance_mins}분** 남았습니다. (오늘 총 업무 노동 시간: {spent_work_time}분)")
         
-        # 5. 상단 막대그래프
         overview_df = pd.DataFrame({
             '지표': ['1. 경과 시간', '2. 운동 확보', '3. 업무 노동'],
             '시간(분)': [elapsed_mins, earned_time, spent_work_time]
         }).set_index('지표')
         st.bar_chart(overview_df, height=150)
 
-        # 6. 시간대별 꺾은선 그래프
         hours_list = [f"{h:02d}시" for h in range(7, 24)]
         hourly_df = pd.DataFrame(index=hours_list, columns=['운동', '업무']).fillna(0)
         
